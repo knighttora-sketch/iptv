@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StreamVault — IPTV Player</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-deep: #06080d;
+            --bg: #0c1017;
+            --bg-card: #141920;
+            --bg-elevated: #1a2029;
+            --border: #252d3a;
+            --fg: #e8ecf1;
+            --fg-muted: #7a8494;
+            --accent: #e84545;
+            --accent-glow: rgba(232, 69, 69, 0.35);
+            --accent-soft: #ff6b6b;
+            --green: #2dd4a0;
+            --green-glow: rgba(45, 212, 160, 0.3);
+            --amber: #f59e0b;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg-deep);
+            color: var(--fg);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Ambient background */
+        .ambient-bg {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background:
+                radial-gradient(ellipse 60% 40% at 15% 20%, rgba(232,69,69,0.07) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 50% at 85% 80%, rgba(45,212,160,0.05) 0%, transparent 70%),
+                radial-gradient(ellipse 80% 60% at 50% 50%, rgba(20,25,32,0.9) 0%, var(--bg-deep) 100%);
+        }
+
+        /* Noise texture overlay */
+        .noise-overlay {
+            position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            background-size: 128px 128px;
+        }
+
+        .app-container { position: relative; z-index: 2; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); }
+
+        /* Input styles */
+        .input-field {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.25s, box-shadow 0.25s;
+        }
+        .input-field::placeholder { color: var(--fg-muted); opacity: 0.6; }
+        .input-field:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* Button */
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+            font-weight: 600;
+            padding: 12px 28px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 14px;
+            transition: transform 0.15s, box-shadow 0.25s, background 0.2s;
+            display: inline-flex; align-items: center; gap: 8px;
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px var(--accent-glow);
+            background: var(--accent-soft);
+        }
+        .btn-primary:active { transform: translateY(0); }
+        .btn-primary:disabled {
+            opacity: 0.5; cursor: not-allowed; transform: none;
+            box-shadow: none;
+        }
+
+        .btn-secondary {
+            background: var(--bg-elevated);
+            color: var(--fg);
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 13px;
+            transition: background 0.2s, border-color 0.2s;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-secondary:hover {
+            background: var(--bg-card);
+            border-color: var(--fg-muted);
+        }
+
+        /* Card */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+        }
+
+        /* Channel list item */
+        .channel-item {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            border: 1px solid transparent;
+        }
+        .channel-item:hover {
+            background: var(--bg-elevated);
+            border-color: var(--border);
+        }
+        .channel-item.active {
+            background: rgba(232, 69, 69, 0.1);
+            border-color: var(--accent);
+        }
+        .channel-item.active .ch-icon {
+            background: var(--accent);
+            color: #fff;
+        }
+
+        .ch-icon {
+            width: 36px; height: 36px;
+            border-radius: 8px;
+            background: var(--bg-elevated);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 700;
+            color: var(--fg-muted);
+            flex-shrink: 0;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        /* Player area */
+        .player-wrapper {
+            position: relative;
+            background: #000;
+            border-radius: 14px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+            border: 1px solid var(--border);
+        }
+        .player-wrapper video {
+            width: 100%; height: 100%; object-fit: contain;
+            display: block;
+        }
+
+        /* Player overlay controls */
+        .player-overlay {
+            position: absolute; inset: 0;
+            background: linear-gradient(transparent 50%, rgba(0,0,0,0.7) 100%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            display: flex; flex-direction: column; justify-content: flex-end;
+            padding: 20px;
+            pointer-events: none;
+        }
+        .player-wrapper:hover .player-overlay,
+        .player-wrapper.show-controls .player-overlay {
+            opacity: 1; pointer-events: auto;
+        }
+
+        /* Status badge */
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            display: inline-block; flex-shrink: 0;
+        }
+        .status-dot.online { background: var(--green); box-shadow: 0 0 8px var(--green-glow); }
+        .status-dot.offline { background: var(--fg-muted); }
+        .status-dot.connecting {
+            background: var(--amber);
+            animation: pulse-dot 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Toast */
+        .toast-container {
+            position: fixed; top: 24px; right: 24px; z-index: 9999;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .toast {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            display: flex; align-items: center; gap: 10px;
+            animation: slide-in 0.35s ease-out;
+            max-width: 360px;
+        }
+        .toast.error { border-color: var(--accent); }
+        .toast.success { border-color: var(--green); }
+
+        @keyframes slide-in {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slide-out {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+
+        /* Logo animation */
+        .logo-pulse {
+            animation: logo-glow 3s ease-in-out infinite;
+        }
+        @keyframes logo-glow {
+            0%, 100% { filter: drop-shadow(0 0 6px var(--accent-glow)); }
+            50% { filter: drop-shadow(0 0 16px var(--accent-glow)); }
+        }
+
+        /* Category tab */
+        .cat-tab {
+            padding: 6px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+            color: var(--fg-muted);
+            background: transparent;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+        .cat-tab:hover { color: var(--fg); background: var(--bg-elevated); }
+        .cat-tab.active {
+            color: var(--accent);
+            background: rgba(232,69,69,0.1);
+            border-color: rgba(232,69,69,0.3);
+        }
+
+        /* Volume slider */
+        .volume-slider {
+            -webkit-appearance: none; appearance: none;
+            width: 80px; height: 4px;
+            background: var(--border);
+            border-radius: 4px; outline: none;
+            cursor: pointer;
+        }
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; appearance: none;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            box-shadow: 0 0 6px var(--accent-glow);
+        }
+
+        /* Loading spinner */
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Scan line effect on player when no content */
+        .scanlines {
+            position: absolute; inset: 0; pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.08) 2px,
+                rgba(0,0,0,0.08) 4px
+            );
+            z-index: 2;
+        }
+
+        /* No signal screen */
+        .no-signal {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: var(--fg-muted); gap: 12px;
+        }
+        .no-signal i { font-size: 48px; opacity: 0.3; }
+        .no-signal span { font-size: 14px; opacity: 0.5; }
+
+        /* Search input in channel list */
+        .search-ch {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--fg);
+            font-size: 12px;
+            padding: 8px 12px 8px 32px;
+            border-radius: 8px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .search-ch:focus { border-color: var(--accent); }
+        .search-ch::placeholder { color: var(--fg-muted); opacity: 0.5; }
+
+        /* Keyboard hint */
+        kbd {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--fg-muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-grid { grid-template-columns: 1fr !important; }
+            .sidebar { max-height: 400px; }
+        }
+
+        /* EPG bar */
+        .epg-bar {
+            height: 4px;
+            background: var(--bg-elevated);
+            border-radius: 4px;
+            overflow: hidden;
+            flex: 1;
+        }
+        .epg-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+
+        /* Favorites star */
+        .fav-star {
+            cursor: pointer;
+            color: var(--fg-muted);
+            transition: color 0.2s, transform 0.2s;
+            font-size: 14px;
+        }
+        .fav-star:hover { transform: scale(1.2); }
+        .fav-star.active { color: var(--amber); }
+    </style>
+</head>
+<body>
+    <div class="ambient-bg"></div>
+    <div class="noise-overlay"></div>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="app-container" style="max-width: 1440px; margin: 0 auto; padding: 20px;">
+
+        <!-- Header -->
+        <header style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; padding: 0 4px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div class="logo-pulse" style="width:38px; height:38px; background:var(--accent); border-radius:10px; display:flex; align-items:center; justify-content:center;">
+                    <i class="fas fa-satellite-dish" style="color:#fff; font-size:18px;"></i>
+                </div>
+                <div>
+                    <div style="font-size:20px; font-weight:700; letter-spacing:-0.5px;">StreamVault</div>
+                    <div style="font-size:11px; color:var(--fg-muted); margin-top:-2px;">IPTV Player</div>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div id="connectionStatus" style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--fg-muted);">
+                    <span class="status-dot offline"></span>
+                    <span>Disconnected</span>
+                </div>
+                <button class="btn-secondary" onclick="showShortcuts()" title="Keyboard Shortcuts">
+                    <i class="fas fa-keyboard"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Connection Panel -->
+        <div class="card" id="connectionPanel" style="margin-bottom:24px;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:20px;">
+                <i class="fas fa-plug" style="color:var(--accent); font-size:14px;"></i>
+                <span style="font-weight:600; font-size:15px;">Connection Settings</span>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 2fr auto; gap:16px; align-items:end;">
+                <div>
+                    <label style="display:block; font-size:11px; color:var(--fg-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px;">MAC Address</label>
+                    <input type="text" class="input-field" id="macInput" placeholder="00:1A:2B:3C:4D:5E" value="00:1A:79:12:34:56" spellcheck="false">
+                </div>
+                <div>
+                    <label style="display:block; font-size:11px; color:var(--fg-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px;">Portal URL</label>
+                    <input type="text" class="input-field" id="portalInput" placeholder="http://example.com/c" spellcheck="false">
+                </div>
+                <button class="btn-primary" id="connectBtn" onclick="connectPortal()">
+                    <i class="fas fa-bolt"></i>
+                    Connect
+                </button>
+            </div>
+            <div style="margin-top:12px; display:flex; gap:16px; flex-wrap:wrap;">
+                <div style="font-size:11px; color:var(--fg-muted);">
+                    <i class="fas fa-info-circle" style="margin-right:4px;"></i>
+                    Format MAC: XX:XX:XX:XX:XX:XX
+                </div>
+                <div style="font-size:11px; color:var(--fg-muted);">
+                    Portal endpoint: /c/ untuk Stalker, /live/ untuk HLS
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="main-grid" style="display:grid; grid-template-columns: 320px 1fr; gap:20px;">
+
+            <!-- Sidebar: Channel List -->
+            <div class="sidebar" style="display:flex; flex-direction:column; gap:16px;">
+
+                <!-- Category Tabs -->
+                <div class="card" style="padding:16px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                        <i class="fas fa-layer-group" style="color:var(--accent); font-size:13px;"></i>
+                        <span style="font-weight:600; font-size:13px;">Categories</span>
+                    </div>
+                    <div id="categoryTabs" style="display:flex; gap:6px; flex-wrap:wrap;">
+                        <div class="cat-tab active" data-cat="all" onclick="filterCategory('all')">All</div>
+                        <div class="cat-tab" data-cat="favorites" onclick="filterCategory('favorites')">
+                            <i class="fas fa-star" style="font-size:10px; color:var(--amber);"></i> Favs
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Channel List -->
+                <div class="card" style="padding:16px; flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <i class="fas fa-list" style="color:var(--accent); font-size:13px;"></i>
+                            <span style="font-weight:600; font-size:13px;">Channels</span>
+                            <span id="channelCount" style="font-size:11px; color:var(--fg-muted); background:var(--bg-elevated); padding:2px 8px; border-radius:6px;">0</span>
+                        </div>
+                        <div style="font-size:11px; color:var(--fg-muted);">
+                            <kbd>↑</kbd><kbd>↓</kbd> navigate
+                        </div>
+                    </div>
+
+                    <!-- Search -->
+                    <div style="position:relative; margin-bottom:12px;">
+                        <i class="fas fa-search" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:11px; color:var(--fg-muted); opacity:0.5;"></i>
+                        <input type="text" class="search-ch" id="channelSearch" placeholder="Cari channel..." oninput="searchChannels()">
+                    </div>
+
+                    <!-- Channel list scroll area -->
+                    <div id="channelList" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:4px;">
+                        <div style="text-align:center; padding:40px 0; color:var(--fg-muted); font-size:13px;">
+                            <i class="fas fa-satellite-dish" style="font-size:32px; opacity:0.2; display:block; margin-bottom:12px;"></i>
+                            Connect to portal first
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main: Player + Info -->
+            <div style="display:flex; flex-direction:column; gap:16px;">
+
+                <!-- Player -->
+                <div class="card" style="padding:16px;">
+                    <div class="player-wrapper" id="playerWrapper">
+                        <video id="videoPlayer" playsinline></video>
+                        <div class="scanlines"></div>
+
+                        <!-- No signal screen -->
+                        <div class="no-signal" id="noSignal">
+                            <i class="fas fa-tv"></i>
+                            <span>No Signal</span>
+                        </div>
+
+                        <!-- Loading overlay -->
+                        <div id="loadingOverlay" style="position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.6); z-index:3;">
+                            <div class="spinner"></div>
+                        </div>
+
+                        <!-- Player controls overlay -->
+                        <div class="player-overlay">
+                            <div style="display:flex; align-items:center; justify-content:space-between;">
+                                <div style="display:flex; align-items:center; gap:14px;">
+                                    <button onclick="togglePlayPause()" style="background:none; border:none; color:#fff; cursor:pointer; font-size:20px;">
+                                        <i class="fas fa-play" id="playPauseIcon"></i>
+                                    </button>
+                                    <button onclick="stopPlayback()" style="background:none; border:none; color:#fff; cursor:pointer; font-size:16px;">
+                                        <i class="fas fa-stop"></i>
+                                    </button>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <button onclick="toggleMute()" style="background:none; border:none; color:#fff; cursor:pointer; font-size:14px;">
+                                            <i class="fas fa-volume-up" id="volumeIcon"></i>
+                                        </button>
+                                        <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="80" oninput="changeVolume(this.value)">
+                                    </div>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <span id="nowPlayingLabel" style="font-size:12px; color:rgba(255,255,255,0.7); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+                                    <button onclick="toggleFullscreen()" style="background:none; border:none; color:#fff; cursor:pointer; font-size:16px;">
+                                        <i class="fas fa-expand" id="fullscreenIcon"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Now Playing Info -->
+                <div class="card" id="nowPlayingCard" style="padding:20px;">
+                    <div style="display:flex; align-items:center; gap:16px;">
+                        <div id="npIcon" style="width:52px; height:52px; border-radius:12px; background:var(--bg-elevated); display:flex; align-items:center; justify-content:center; font-size:20px; color:var(--fg-muted); flex-shrink:0;">
+                            <i class="fas fa-tv"></i>
+                        </div>
+                        <div style="flex:1; min-width:0;">
+                            <div id="npTitle" style="font-weight:600; font-size:16px; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">No Channel Selected</div>
+                            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                                <span id="npCategory" style="font-size:11px; color:var(--fg-muted); background:var(--bg-elevated); padding:3px 10px; border-radius:6px;">—</span>
+                                <span id="npStreamInfo" style="font-size:11px; color:var(--fg-muted);">—</span>
+                            </div>
+                            <!-- Progress bar for EPG -->
+                            <div style="display:flex; align-items:center; gap:8px; margin-top:10px;">
+                                <span id="npNow" style="font-size:10px; color:var(--green); white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis;">—</span>
+                                <div class="epg-bar">
+                                    <div class="epg-bar-fill" id="epgFill" style="width:0%;"></div>
+                                </div>
+                                <span id="npNext" style="font-size:10px; color:var(--fg-muted); white-space:nowrap; max-width:120px; overflow:hidden; text-overflow:ellipsis;">—</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:8px; flex-shrink:0;">
+                            <button class="btn-secondary" onclick="prevChannel()" title="Previous Channel">
+                                <i class="fas fa-chevron-up"></i>
+                            </button>
+                            <button class="btn-secondary" onclick="nextChannel()" title="Next Channel">
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stream Info / Stats -->
+                <div class="card" style="padding:16px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+                        <i class="fas fa-chart-bar" style="color:var(--accent); font-size:13px;"></i>
+                        <span style="font-weight:600; font-size:13px;">Stream Stats</span>
+                    </div>
+                    <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px;">
+                        <div style="text-align:center; padding:12px; background:var(--bg); border-radius:10px;">
+                            <div style="font-size:10px; color:var(--fg-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">Protocol</div>
+                            <div id="statProtocol" style="font-size:14px; font-weight:700; color:var(--accent);">—</div>
+                        </div>
+                        <div style="text-align:center; padding:12px; background:var(--bg); border-radius:10px;">
+                            <div style="font-size:10px; color:var(--fg-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">Resolution</div>
+                            <div id="statResolution" style="font-size:14px; font-weight:700; color:var(--green);">—</div>
+                        </div>
+                        <div style="text-align:center; padding:12px; background:var(--bg); border-radius:10px;">
+                            <div style="font-size:10px; color:var(--fg-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">Buffer</div>
+                            <div id="statBuffer" style="font-size:14px; font-weight:700; color:var(--amber);">—</div>
+                        </div>
+                        <div style="text-align:center; padding:12px; background:var(--bg); border-radius:10px;">
+                            <div style="font-size:10px; color:var(--fg-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px;">Duration</div>
+                            <div id="statDuration" style="font-size:14px; font-weight:700; color:var(--fg);">00:00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="shortcutsModal" style="display:none; position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+        <div class="card" style="max-width:400px; width:90%; padding:28px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+                <span style="font-weight:700; font-size:16px;">Keyboard Shortcuts</span>
+                <button onclick="hideShortcuts()" style="background:none; border:none; color:var(--fg-muted); cursor:pointer; font-size:18px;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px; font-size:13px;">
+                <div style="display:flex; justify-content:space-between;"><span>Play / Pause</span><kbd>Space</kbd></div>
+                <div style="display:flex; justify-content:space-between;"><span>Fullscreen</span><kbd>F</kbd></div>
+                <div style="display:flex; justify-content:space-between;"><span>Mute</span><kbd>M</kbd></div>
+                <div style="display:flex; justify-content:space-between;"><span>Volume Up</span><kbd>↑</kbd> (when player focused)</div>
+                <div style="display:flex; justify-content:space-between;"><span>Volume Down</span><kbd>↓</kbd> (when player focused)</div>
+                <div style="display:flex; justify-content:space-between;"><span>Next Channel</span><kbd>N</kbd></div>
+                <div style="display:flex; justify-content:space-between;"><span>Prev Channel</span><kbd>P</kbd></div>
+                <div style="display:flex; justify-content:space-between;"><span>Search Channels</span><kbd>/</kbd></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== State ====================
+        let channels = [];
+        let filteredChannels = [];
+        let currentChannelIndex = -1;
+        let isConnected = false;
+        let favorites = new Set();
+        let currentCategory = 'all';
+        let controlsTimeout = null;
+        let durationInterval = null;
+        let streamStartTime = null;
+
+        const video = document.getElementById('videoPlayer');
+        const playerWrapper = document.getElementById('playerWrapper');
+
+        // ==================== Toast System ====================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const iconMap = { info: 'fa-info-circle', error: 'fa-exclamation-circle', success: 'fa-check-circle' };
+            const colorMap = { info: 'var(--fg-muted)', error: 'var(--accent)', success: 'var(--green)' };
+            toast.innerHTML = `<i class="fas ${iconMap[type] || iconMap.info}" style="color:${colorMap[type] || colorMap.info}; font-size:16px;"></i><span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = 'slide-out 0.3s ease-in forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // ==================== MAC Validation ====================
+        function validateMac(mac) {
+            const cleaned = mac.replace(/[^0-9A-Fa-f:]/g, '');
+            const pattern = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
+            return pattern.test(cleaned);
+        }
+
+        function formatMacInput(input) {
+            // Auto-format saat mengetik
+            let val = input.value.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+            let formatted = '';
+            for (let i = 0; i < val.length && i < 12; i++) {
+                if (i > 0 && i % 2 === 0) formatted += ':';
+                formatted += val[i];
+            }
+            input.value = formatted;
+        }
+
+        document.getElementById('macInput').addEventListener('input', function() {
+            formatMacInput(this);
+        });
+
+        // ==================== Connection ====================
+        function connectPortal() {
+            const mac = document.getElementById('macInput').value.trim();
+            const portal = document.getElementById('portalInput').value.trim();
+
+            if (!validateMac(mac)) {
+                showToast('Format MAC Address tidak valid! Contoh: 00:1A:2B:3C:4D:5E', 'error');
+                return;
+            }
+
+            if (!portal) {
+                showToast('Portal URL tidak boleh kosong!', 'error');
+                return;
+            }
+
+            try {
+                new URL(portal);
+            } catch {
+                showToast('URL Portal tidak valid! Pastikan format URL benar.', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('connectBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+
+            // Update status
+            updateConnectionStatus('connecting');
+
+            // Simulasi koneksi ke portal Stalker/M3U
+            setTimeout(() => {
+                isConnected = true;
+                updateConnectionStatus('online');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-bolt"></i> Connect';
+
+                // Generate channels berdasarkan portal
+                generateChannels(portal, mac);
+                showToast(`Connected! ${channels.length} channels loaded.`, 'success');
+            }, 1500);
+        }
+
+        function updateConnectionStatus(status) {
+            const el = document.getElementById('connectionStatus');
+            const map = {
+                offline: { dot: 'offline', text: 'Disconnected' },
+                connecting: { dot: 'connecting', text: 'Connecting...' },
+                online: { dot: 'online', text: 'Connected' }
+            };
+            const s = map[status] || map.offline;
+            el.innerHTML = `<span class="status-dot ${s.dot}"></span><span>${s.text}</span>`;
+        }
+
+        // ==================== Generate Channels ====================
+        function generateChannels(portal, mac) {
+            // Membuat daftar channel simulasi dari portal
+            const categories = ['Sports', 'News', 'Entertainment', 'Movie', 'Kids', 'Music', 'Documentary', 'Religious', 'Lifestyle', 'Education'];
+            const channelNames = {
+                Sports: ['BeIN Sports 1', 'BeIN Sports 2', 'ESPN HD', 'Sky Sports F1', 'Fox Sports', 'Star Sports 1', 'Super Sport 3', 'DAZN Live', 'Tennis Channel', 'NBA TV'],
+                News: ['CNN International', 'BBC World', 'Al Jazeera HD', 'CNBC Live', 'Fox News', 'Sky News', 'DW English', 'France 24', 'RT HD', 'Bloomberg'],
+                Entertainment: ['HBO HD', 'Fox HD', 'AXN', 'Sony Entertainment', 'Star World', 'TNT HD', 'Comedy Central', 'Bravo HD', 'E! Entertainment', 'TLC'],
+                Movie: ['HBO Hits', 'Cinemax HD', 'Star Movies', 'Fox Movies', 'MGM HD', 'Paramount Channel', 'Sony Movie', 'Universal TV', 'Hallmark Channel', 'IFilm'],
+                Kids: ['Cartoon Network', 'Disney Channel', 'Nickelodeon', 'Boomerang', 'Baby TV', 'Disney Junior', 'Nick Jr', 'Pogo TV', 'Animax', 'KBS Kids'],
+                Music: ['MTV Hits', 'VH1 Classic', 'MTV Live', 'Channel V', 'Mezzo Live', 'Stingray Music', 'Trace Urban', 'MNet', 'CMT', 'BET'],
+                Documentary: ['National Geo', 'Discovery HD', 'Animal Planet', 'History Channel', 'Science Channel', 'Nat Geo Wild', 'Discovery Science', 'DIY Network', 'Travel Channel', 'Crime+Investigation'],
+                Religious: ['Quran TV', 'Saudi Sunnah', 'Iqraa', 'Al Resalah', 'Huda TV', 'Peace TV', 'Wesal TV', 'Noor Dubai', 'Ahlulbayt TV', 'Imam Ali TV'],
+                Lifestyle: ['Food Network', 'HGTV', 'Cooking Channel', 'DIY Network', 'Lifetime', 'Oxygen', 'FYI Network', 'Magnolia', 'Dabl', 'GAC'],
+                Education: ['Discovery Education', 'PBS HD', 'C-SPAN', 'NASA TV', 'Smithsonian', 'Knowledge Network', 'Create TV', 'World Channel', 'PBS Kids', 'Michigan TV']
+            };
+
+            const baseUrls = [
+                // Format Stalker portal
+                `${portal}/c/channels`,
+                `${portal}/live/${mac}`,
+                `${portal}/stream`
+            ];
+
+            channels = [];
+            let id = 1;
+
+            categories.forEach(cat => {
+                const names = channelNames[cat];
+                names.forEach((name, idx) => {
+                    // Buat URL stream yang realistis
+                    const streamUrl = `${portal}/live/${mac}/${id}.ts`;
+                    const altUrl = `${portal}/live/${mac}/${id}.m3u8`;
+
+                    channels.push({
+                        id: id,
+                        name: name,
+                        category: cat,
+                        number: 100 + id,
+                        streamUrl: streamUrl,
+                        altUrl: altUrl,
+                        logo: `https://picsum.photos/seed/ch${id}/80/80.jpg`,
+                        epgNow: generateEPGTitle(cat),
+                        epgNext: generateEPGTitle(cat),
+                        epgProgress: Math.random() * 100
+                    });
+                    id++;
+                });
+            });
+
+            // Load favorites dari localStorage
+            const savedFavs = localStorage.getItem('sv_favorites');
+            if (savedFavs) {
+                favorites = new Set(JSON.parse(savedFavs));
+            }
+
+            // Update category tabs
+            updateCategoryTabs();
+            filterCategory('all');
+        }
+
+        function generateEPGTitle(cat) {
+            const titles = {
+                Sports: ['Premier League Live', 'NBA Highlights', 'F1 Practice Session', 'Tennis Open', 'Champions League', 'World Cup Qualifier'],
+                News: ['Breaking News', 'World Report', 'Business Today', 'Tech Review', 'Climate Update', 'Election Coverage'],
+                Entertainment: ['The Tonight Show', 'Late Night Talk', 'Reality Series', 'Comedy Special', 'Talent Show', 'Drama Series'],
+                Movie: ['Blockbuster Hits', 'Classic Films', 'Action Marathon', 'Horror Night', 'Romance Hour', 'Sci-Fi Sunday'],
+                Kids: ['Adventure Time', 'SpongeBob SquarePants', 'The Powerpuff Girls', 'Tom & Jerry', 'Doraemon', 'Pokemon'],
+                Music: ['Top 40 Countdown', 'Live Concert', 'Acoustic Session', 'Music Videos', 'DJ Mix', 'Classical Hour'],
+                Documentary: ['Planet Earth', 'Ancient History', 'Space Discovery', 'Ocean Deep', 'Wild Safari', 'Tech Frontiers'],
+                Religious: ['Morning Sermon', 'Quran Recitation', 'Prayer Time', 'Islamic History', 'Community Talk', 'Live from Mecca'],
+                Lifestyle: ['Cooking Master', 'Home Design', 'Garden Show', 'Travel Log', 'Fashion Week', 'Wellness Tips'],
+                Education: ['Science Lab', 'Math Tutorial', 'History Class', 'Art Lesson', 'Coding 101', 'Nature Study']
+            };
+            const list = titles[cat] || titles['Entertainment'];
+            return list[Math.floor(Math.random() * list.length)];
+        }
+
+        // ==================== Category Tabs ====================
+        function updateCategoryTabs() {
+            const container = document.getElementById('categoryTabs');
+            const cats = [...new Set(channels.map(c => c.category))];
+
+            container.innerHTML = `
+                <div class="cat-tab ${currentCategory === 'all' ? 'active' : ''}" data-cat="all" onclick="filterCategory('all')">All</div>
+                <div class="cat-tab ${currentCategory === 'favorites' ? 'active' : ''}" data-cat="favorites" onclick="filterCategory('favorites')">
+                    <i class="fas fa-star" style="font-size:10px; color:var(--amber);"></i> Favs
+                </div>
+            `;
+
+            cats.forEach(cat => {
+                const count = channels.filter(c => c.category === cat).length;
+                container.innerHTML += `
+                    <div class="cat-tab ${currentCategory === cat ? 'active' : ''}" data-cat="${cat}" onclick="filterCategory('${cat}')">
+                        ${cat} <span style="opacity:0.5;">${count}</span>
+                    </div>
+                `;
+            });
+        }
+
+        function filterCategory(cat) {
+            currentCategory = cat;
+            updateCategoryTabs();
+
+            if (cat === 'all') {
+                filteredChannels = [...channels];
+            } else if (cat === 'favorites') {
+                filteredChannels = channels.filter(c => favorites.has(c.id));
+            } else {
+                filteredChannels = channels.filter(c => c.category === cat);
+            }
+
+            // Apply search juga
+            searchChannels();
+        }
+
+        // ==================== Search ====================
+        function searchChannels() {
+            const query = document.getElementById('channelSearch').value.toLowerCase().trim();
+
+            let base;
+            if (currentCategory === 'all') {
+                base = [...channels];
+            } else if (currentCategory === 'favorites') {
+                base = channels.filter(c => favorites.has(c.id));
+            } else {
+                base = channels.filter(c => c.category === currentCategory);
+            }
+
+            if (query) {
+                filteredChannels = base.filter(c =>
+                    c.name.toLowerCase().includes(query) ||
+                    c.category.toLowerCase().includes(query) ||
+                    c.number.toString().includes(query)
+                );
+            } else {
+                filteredChannels = base;
+            }
+
+            renderChannelList();
+        }
+
+        // ==================== Render Channel List ====================
+        function renderChannelList() {
+            const container = document.getElementById('channelList');
+            const countEl = document.getElementById('channelCount');
+            countEl.textContent = filteredChannels.length;
+
+            if (filteredChannels.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align:center; padding:40px 0; color:var(--fg-muted); font-size:13px;">
+                        <i class="fas fa-search" style="font-size:28px; opacity:0.2; display:block; margin-bottom:12px;"></i>
+                        No channels found
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+
+            filteredChannels.forEach((ch, idx) => {
+                const isActive = channels.indexOf(ch) === currentChannelIndex;
+                const isFav = favorites.has(ch.id);
+
+                const item = document.createElement('div');
+                item.className = `channel-item ${isActive ? 'active' : ''}`;
+                item.onclick = () => playChannel(channels.indexOf(ch));
+                item.setAttribute('data-index', idx);
+
+                item.innerHTML = `
+                    <div class="ch-icon">${ch.number}</div>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${ch.name}</div>
+                        <div style="font-size:10px; color:var(--fg-muted); margin-top:2px;">${ch.category} · ${ch.epgNow}</div>
+                    </div>
+                    <i class="fas fa-star fav-star ${isFav ? 'active' : ''}" onclick="event.stopPropagation(); toggleFavorite(${ch.id})" title="Toggle Favorite"></i>
+                `;
+
+                container.appendChild(item);
+            });
+
+            // Scroll ke channel aktif
+            if (currentChannelIndex >= 0) {
+                const activeCh = channels[currentChannelIndex];
+                const activeIdx = filteredChannels.indexOf(activeCh);
+                if (activeIdx >= 0) {
+                    const activeEl = container.children[activeIdx];
+                    if (activeEl) {
+                        activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    }
+                }
+            }
+        }
+
+        // ==================== Favorites ====================
+        function toggleFavorite(chId) {
+            if (favorites.has(chId)) {
+                favorites.delete(chId);
+                showToast('Removed from favorites', 'info');
+            } else {
+                favorites.add(chId);
+                showToast('Added to favorites', 'success');
+            }
+            localStorage.setItem('sv_favorites', JSON.stringify([...favorites]));
+            renderChannelList();
+        }
+
+        // ==================== Play Channel ====================
+        function playChannel(index) {
+            if (index < 0 || index >= channels.length) return;
+
+            const ch = channels[index];
+            currentChannelIndex = index;
+
+            // Update UI
+            document.getElementById('noSignal').style.display = 'none';
+            document.getElementById('loadingOverlay').style.display = 'flex';
+
+            // Update Now Playing
+            document.getElementById('npTitle').textContent = ch.name;
+            document.getElementById('npCategory').textContent = ch.category;
+            document.getElementById('npStreamInfo').textContent = `CH ${ch.number} · ${ch.streamUrl.split('.').pop().toUpperCase()}`;
+            document.getElementById('npNow').textContent = ch.epgNow;
+            document.getElementById('npNext').textContent = ch.epgNext;
+            document.getElementById('epgFill').style.width = `${ch.epgProgress}%`;
+            document.getElementById('nowPlayingLabel').textContent = ch.name;
+
+            // Update stat
+            const ext = ch.streamUrl.split('.').pop();
+            document.getElementById('statProtocol').textContent = ext === 'ts' ? 'MPEG-TS' : ext === 'm3u8' ? 'HLS' : ext.toUpperCase();
+
+            // Coba mainkan stream
+            // Catatan: Karena CORS dan origin restriction, kebanyakan IPTV stream
+            // tidak bisa langsung dimainkan dari browser. Kita coba load dan handle error.
+            video.src = ch.streamUrl;
+            video.load();
+
+            // Jika load gagal setelah timeout, coba alternate URL
+            const loadTimeout = setTimeout(() => {
+                if (video.readyState < 2) {
+                    // Coba alternate URL
+                    video.src = ch.altUrl;
+                    video.load();
+                }
+            }, 5000);
+
+            video.onloadeddata = () => {
+                clearTimeout(loadTimeout);
+                document.getElementById('loadingOverlay').style.display = 'none';
+                video.play().catch(() => {});
+                updatePlayPauseIcon();
+                updateStreamStats();
+                startDurationTimer();
+                showToast(`Now playing: ${ch.name}`, 'success');
+            };
+
+            video.onerror = () => {
+                clearTimeout(loadTimeout);
+                // Kedua URL juga gagal - tampilkan demo mode
+                document.getElementById('loadingOverlay').style.display = 'none';
+                showDemoMode(ch);
+            };
+
+            // Render channel list untuk highlight active
+            renderChannelList();
+        }
+
+        function showDemoMode(ch) {
+            // Karena stream IPTS biasanya tidak bisa diakses langsung dari browser (CORS),
+            // kita tampilkan visualisasi demo dengan canvas
+            const noSignal = document.getElementById('noSignal');
+            noSignal.style.display = 'flex';
+            noSignal.innerHTML = `
+                <i class="fas fa-broadcast-tower" style="font-size:48px; opacity:0.3; color:var(--accent);"></i>
+                <span style="font-size:14px; opacity:0.7;">${ch.name}</span>
+                <span style="font-size:11px; opacity:0.4; max-width:300px; text-align:center; line-height:1.5;">
+                    Stream URL: ${ch.streamUrl}<br>
+                    <span style="color:var(--amber);">Browser CORS policy mungkin memblokir stream ini.</span><br>
+                    Gunakan extension CORS Unblock atau VLC untuk memutar langsung.
+                </span>
+                <button onclick="copyStreamUrl()" class="btn-secondary" style="margin-top:8px; font-size:12px;">
+                    <i class="fas fa-copy"></i> Copy Stream URL
+                </button>
+                <button onclick="openInVLC()" class="btn-secondary" style="font-size:12px;">
+                    <i class="fas fa-external-link-alt"></i> Open in VLC
+                </button>
+            `;
+
+            updateStreamStats();
+            startDurationTimer();
+        }
+
+        function copyStreamUrl() {
+            if (currentChannelIndex < 0) return;
+            const ch = channels[currentChannelIndex];
+            navigator.clipboard.writeText(ch.streamUrl).then(() => {
+                showToast('Stream URL disalin ke clipboard!', 'success');
+            }).catch(() => {
+                // Fallback
+                const ta = document.createElement('textarea');
+                ta.value = ch.streamUrl;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+                showToast('Stream URL disalin!', 'success');
+            });
+        }
+
+        function openInVLC() {
+            if (currentChannelIndex < 0) return;
+            const ch = channels[currentChannelIndex];
+            // VLC protocol handler
+            window.open(`vlc://${ch.streamUrl}`, '_blank');
+            showToast('Membuka di VLC...', 'info');
+        }
+
+        // ==================== Player Controls ====================
+        function togglePlayPause() {
+            if (video.paused) {
+                video.play().catch(() => {});
+            } else {
+                video.pause();
+            }
+            updatePlayPauseIcon();
+        }
+
+        function updatePlayPauseIcon() {
+            const icon = document.getElementById('playPauseIcon');
+            icon.className = video.paused ? 'fas fa-play' : 'fas fa-pause';
+        }
+
+        function stopPlayback() {
+            video.pause();
+            video.src = '';
+            document.getElementById('noSignal').style.display = 'flex';
+            document.getElementById('noSignal').innerHTML = '<i class="fas fa-tv"></i><span>No Signal</span>';
+            document.getElementById('playPauseIcon').className = 'fas fa-play';
+            stopDurationTimer();
+            showToast('Playback stopped', 'info');
+        }
+
+        function toggleMute() {
+            video.muted = !video.muted;
+            const icon = document.getElementById('volumeIcon');
+            icon.className = video.muted ? 'fas fa-volume-mute' : 'fas fa-volume-up';
+            document.getElementById('volumeSlider').value = video.muted ? 0 : video.volume * 100;
+        }
+
+        function changeVolume(val) {
+            video.volume = val / 100;
+            const icon = document.getElementById('volumeIcon');
+            if (val == 0) {
+                icon.className = 'fas fa-volume-mute';
+                video.muted = true;
+            } else {
+                icon.className = 'fas fa-volume-up';
+                video.muted = false;
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                playerWrapper.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            const icon = document.getElementById('fullscreenIcon');
+            icon.className = document.fullscreenElement ? 'fas fa-compress' : 'fas fa-expand';
+        });
+
+        // Auto-show controls on mouse move
+        playerWrapper.addEventListener('mousemove', () => {
+            playerWrapper.classList.add('show-controls');
+            clearTimeout(controlsTimeout);
+            controlsTimeout = setTimeout(() => {
+                playerWrapper.classList.remove('show-controls');
+            }, 3000);
+        });
+
+        // ==================== Channel Navigation ====================
+        function prevChannel() {
+            if (filteredChannels.length === 0) return;
+            const currentInFiltered = filteredChannels.indexOf(channels[currentChannelIndex]);
+            const newIdx = currentInFiltered > 0 ? currentInFiltered - 1 : filteredChannels.length - 1;
+            const globalIdx = channels.indexOf(filteredChannels[newIdx]);
+            playChannel(globalIdx);
+        }
+
+        function nextChannel() {
+            if (filteredChannels.length === 0) return;
+            const currentInFiltered = filteredChannels.indexOf(channels[currentChannelIndex]);
+            const newIdx = currentInFiltered < filteredChannels.length - 1 ? currentInFiltered + 1 : 0;
+            const globalIdx = channels.indexOf(filteredChannels[newIdx]);
+            playChannel(globalIdx);
+        }
+
+        // ==================== Stream Stats ====================
+        function updateStreamStats() {
+            // Resolution
+            if (video.videoWidth && video.videoHeight) {
+                document.getElementById('statResolution').textContent = `${video.videoWidth}x${video.videoHeight}`;
+            } else {
+                document.getElementById('statResolution').textContent = '1280x720';
+            }
+
+            // Buffer
+            if (video.buffered && video.buffered.length > 0) {
+                const buffered = video.buffered.end(video.buffered.length - 1);
+                const current = video.currentTime || 0;
+                const bufferAhead = Math.max(0, buffered - current);
+                document.getElementById('statBuffer').textContent = `${bufferAhead.toFixed(1)}s`;
+            } else {
+                document.getElementById('statBuffer').textContent = '—';
+            }
+        }
+
+        function startDurationTimer() {
+            stopDurationTimer();
+            streamStartTime = Date.now();
+            durationInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - streamStartTime) / 1000);
+                const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const secs = (elapsed % 60).toString().padStart(2, '0');
+                document.getElementById('statDuration').textContent = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function stopDurationTimer() {
+            if (durationInterval) {
+                clearInterval(durationInterval);
+                durationInterval = null;
+            }
+        }
+
+        // Update stats secara berkala saat video playing
+        video.addEventListener('timeupdate', () => {
+            updateStreamStats();
+            updatePlayPauseIcon();
+        });
+
+        video.addEventListener('waiting', () => {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        });
+
+        video.addEventListener('playing', () => {
+            document.getElementById('loadingOverlay').style.display = 'none';
+            updatePlayPauseIcon();
+        });
+
+        // ==================== Keyboard Shortcuts ====================
+        document.addEventListener('keydown', (e) => {
+            // Jangan handle jika sedang mengetik di input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            switch (e.key.toLowerCase()) {
+                case ' ':
+                    e.preventDefault();
+                    togglePlayPause();
+                    break;
+                case 'f':
+                    e.preventDefault();
+                    toggleFullscreen();
+                    break;
+                case 'm':
+                    e.preventDefault();
+                    toggleMute();
+                    break;
+                case 'n':
+                    e.preventDefault();
+                    nextChannel();
+                    break;
+                case 'p':
+                    e.preventDefault();
+                    prevChannel();
+                    break;
+                case '/':
+                    e.preventDefault();
+                    document.getElementById('channelSearch').focus();
+                    break;
+                case 'arrowup':
+                    if (e.altKey) { prevChannel(); }
+                    else { changeVolume(Math.min(100, video.volume * 100 + 5)); document.getElementById('volumeSlider').value = video.volume * 100; }
+                    break;
+                case 'arrowdown':
+                    if (e.altKey) { nextChannel(); }
+                    else { changeVolume(Math.max(0, video.volume * 100 - 5)); document.getElementById('volumeSlider').value = video.volume * 100; }
+                    break;
+            }
+        });
+
+        // ==================== Shortcuts Modal ====================
+        function showShortcuts() {
+            const modal = document.getElementById('shortcutsModal');
+            modal.style.display = 'flex';
+        }
+
+        function hideShortcuts() {
+            document.getElementById('shortcutsModal').style.display = 'none';
+        }
+
+        document.getElementById('shortcutsModal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) hideShortcuts();
+        });
+
+        // ==================== Init ====================
+        // Set volume awal
+        video.volume = 0.8;
+
+        // Simulasi EPG progress update
+        setInterval(() => {
+            if (currentChannelIndex >= 0) {
+                const ch = channels[currentChannelIndex];
+                ch.epgProgress = Math.min(100, ch.epgProgress + 0.05);
+                document.getElementById('epgFill').style.width = `${ch.epgProgress}%`;
+            }
+        }, 1000);
+
+        // Quick connect dengan Enter di input portal
+        document.getElementById('portalInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') connectPortal();
+        });
+        document.getElementById('macInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('portalInput').focus();
+        });
+
+        // Simpan preferensi MAC dan Portal
+        document.getElementById('macInput').addEventListener('change', function() {
+            localStorage.setItem('sv_mac', this.value);
+        });
+        document.getElementById('portalInput').addEventListener('change', function() {
+            localStorage.setItem('sv_portal', this.value);
+        });
+
+        // Load saved preferences
+        const savedMac = localStorage.getItem('sv_mac');
+        const savedPortal = localStorage.getItem('sv_portal');
+        if (savedMac) document.getElementById('macInput').value = savedMac;
+        if (savedPortal) document.getElementById('portalInput').value = savedPortal;
+    </script>
+</body>
+</html>
